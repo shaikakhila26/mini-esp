@@ -1,0 +1,28 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Local development files
+.DS_Store
+*.log
+
+# IDE settings
+.vscode/
+.idea/
+
+# Test and coverage artifacts
+.coverage
+htmlcov/
+
+# Local database backups
+*.dump
+*.sql.gz
