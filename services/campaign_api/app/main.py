@@ -1,3 +1,5 @@
+from app.routes.recipients import router as recipients_router
+from app.routes.campaigns import router as campaigns_router
 from fastapi import FastAPI, HTTPException
 
 from app.database import check_database
@@ -8,6 +10,8 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.include_router(recipients_router)
+app.include_router(campaigns_router)
 
 @app.get("/health")
 def health():
