@@ -4,6 +4,7 @@ from email.message import EmailMessage
 from email.utils import formatdate
 from html.parser import HTMLParser
 from uuid import UUID
+from email.utils import make_msgid
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -69,6 +70,7 @@ def build_email(
 
     message.set_content(html_to_text(html_body))
     message.add_alternative(html_body, subtype="html")
+    message["Message-ID"] = make_msgid(domain="sunshine.optimoze.com")
 
     return message
 
