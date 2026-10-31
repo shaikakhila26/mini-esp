@@ -1,3 +1,4 @@
+import os
 from uuid import UUID
 import smtplib
 
@@ -29,7 +30,7 @@ from app.schemas import (
     CampaignResponse,
     CampaignSendResponse,
 )
-from app.sending import build_email, send_email
+from app.sending import build_email, send_email, validate_tracking_base_url
 
 router = APIRouter(
     prefix="/campaigns",
@@ -107,9 +108,24 @@ def get_campaign_endpoint(campaign_id: UUID):
     response_model=CampaignSendResponse,
 )
 def send_campaign_endpoint(campaign_id: UUID):
+    # Validate tracking configuration before changing campaign status.
+    tracking_base_url = os.environ.get("TRACK_BASE_URL")
+
+    if tracking_base_url:
+        try:
+            tracking_base_url = validate_tracking_base_url(tracking_base_url)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            )
+
     # Claim the campaign and validate its recipients before sending.
     try:
-        campaign, messages = claim_campaign_for_sending(campaign_id)
+        campaign, messages = claim_campaign_for_sending(
+            campaign_id,
+            tracking_configured=bool(tracking_base_url),
+        )
 
     except CampaignNotFound:
         raise HTTPException(
@@ -153,6 +169,10 @@ def send_campaign_endpoint(campaign_id: UUID):
                 from_email=campaign["from_email"],
                 subject=campaign["subject"],
                 html_body=campaign["html_body"],
+                token=item["token"],
+                tracking_enabled=campaign["tracking_enabled"],
+                approved_links=campaign["links"],
+                tracking_base_url=tracking_base_url,
             )
 
             send_email(email_message)

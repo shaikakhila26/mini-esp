@@ -54,6 +54,19 @@ services:
     ports:
       - "127.0.0.1:1025:1025"
       - "127.0.0.1:8025:8025"
+  grafana:
+    image: grafana/grafana-oss:latest
+    restart: unless-stopped
 
+    ports:
+      - "127.0.0.1:3000:3000"
+
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+    depends_on:
+      postgres:
+        condition: service_healthy
 volumes:
   postgres_data:
+  grafana_data:
