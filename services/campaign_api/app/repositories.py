@@ -264,8 +264,11 @@ class RecipientsNotEligible(Exception):
     pass
 
 
-def claim_campaign_for_sending(campaign_id: UUID) -> tuple[dict, list[dict]]:
-    """Atomically claim a draft campaign and validate its recipients."""
+def claim_campaign_for_sending(
+    campaign_id: UUID,
+    tracking_configured: bool = True,
+) -> tuple[dict, list[dict]]:
+    """Atomically claim a draft campaign and retrieve tracking data."""
 
     with get_connection() as connection:
         row = connection.execute(
@@ -281,7 +284,7 @@ def claim_campaign_for_sending(campaign_id: UUID) -> tuple[dict, list[dict]]:
         if row is None:
             raise CampaignNotFound()
 
-        if row[5]:
+        if row[5] and not tracking_configured:
             raise TrackingMustBeDisabled()
 
         claimed = connection.execute(
@@ -301,7 +304,7 @@ def claim_campaign_for_sending(campaign_id: UUID) -> tuple[dict, list[dict]]:
 
         message_rows = connection.execute(
             """
-            SELECT m.id, m.recipient_id, r.email, r.opted_in
+            SELECT m.id, m.recipient_id, r.email, r.opted_in, m.token
             FROM messages AS m
             JOIN recipients AS r
               ON r.id = m.recipient_id
@@ -314,6 +317,16 @@ def claim_campaign_for_sending(campaign_id: UUID) -> tuple[dict, list[dict]]:
         if not message_rows or any(not message[3] for message in message_rows):
             raise RecipientsNotEligible()
 
+        link_rows = connection.execute(
+            """
+            SELECT link_no, destination_url
+            FROM campaign_links
+            WHERE campaign_id = %s
+            ORDER BY link_no
+            """,
+            (campaign_id,),
+        ).fetchall()
+
         campaign = {
             "id": claimed[0],
             "name": claimed[1],
@@ -322,6 +335,13 @@ def claim_campaign_for_sending(campaign_id: UUID) -> tuple[dict, list[dict]]:
             "from_email": claimed[4],
             "tracking_enabled": claimed[5],
             "status": claimed[6],
+            "links": [
+                {
+                    "link_no": link[0],
+                    "destination_url": link[1],
+                }
+                for link in link_rows
+            ],
         }
 
         messages = [
@@ -329,11 +349,13 @@ def claim_campaign_for_sending(campaign_id: UUID) -> tuple[dict, list[dict]]:
                 "id": message[0],
                 "recipient_id": message[1],
                 "email": message[2],
+                "token": message[4],
             }
             for message in message_rows
         ]
 
         return campaign, messages
+
 
 
 def record_submission_event(
